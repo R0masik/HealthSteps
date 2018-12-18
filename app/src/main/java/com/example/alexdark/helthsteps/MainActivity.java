@@ -47,6 +47,15 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 
+import retrofit2.Call;
+import retrofit2.http.Body;
+import retrofit2.http.GET;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 
@@ -66,6 +75,8 @@ public class MainActivity extends AppCompatActivity implements
     private GoogleSignInClient mGoogleSignInClient;
     private GoogleApiClient mGoogleApiClient;
     private NetworkManager networkManager;
+
+    private static KEK service;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -150,17 +161,25 @@ public class MainActivity extends AppCompatActivity implements
         switch (v.getId()) {
             case R.id.btn_view_today: {
                 //запросы данных
-                new WeekStepTask(DataType.TYPE_STEP_COUNT_DELTA, DataType.AGGREGATE_STEP_COUNT_DELTA).execute();
-                new WeekNutritionTask(DataType.TYPE_NUTRITION, DataType.AGGREGATE_NUTRITION_SUMMARY).execute();
-                new WeekPulseTask(DataType.TYPE_HEART_RATE_BPM, DataType.AGGREGATE_HEART_RATE_SUMMARY).execute();
-                new WeekActivityTask(DataType.TYPE_ACTIVITY_SEGMENT, DataType.AGGREGATE_ACTIVITY_SUMMARY).execute();
+//                new WeekStepTask(DataType.TYPE_STEP_COUNT_DELTA, DataType.AGGREGATE_STEP_COUNT_DELTA).execute();
+//                new WeekNutritionTask(DataType.TYPE_NUTRITION, DataType.AGGREGATE_NUTRITION_SUMMARY).execute();
+//                new WeekPulseTask(DataType.TYPE_HEART_RATE_BPM, DataType.AGGREGATE_HEART_RATE_SUMMARY).execute();
+//                new WeekActivityTask(DataType.TYPE_ACTIVITY_SEGMENT, DataType.AGGREGATE_ACTIVITY_SUMMARY).execute();
+//
+//                String notifyTitle = getResources().getString(R.string.notifyTitle);
+//                String notifyText = getResources().getString(R.string.notifyText);
+//                showNotification(notifyTitle, notifyText);
+//
+//                // запись данныъх в облако
+//                new WriteActivityTask().execute();
 
-                String notifyTitle = getResources().getString(R.string.notifyTitle);
-                String notifyText = getResources().getString(R.string.notifyText);
-                showNotification(notifyTitle, notifyText);
+                Retrofit retrofit = new Retrofit.Builder()
+                        .baseUrl("http://192.168.95.64:32802")
+                        .addConverterFactory(GsonConverterFactory.create())
+                        .build();
 
-                // запись данныъх в облако
-                new WriteActivityTask().execute();
+                service = retrofit.create(KEK.class);
+                foo();
                 break;
             }
             case R.id.sign_in_button: {
@@ -171,6 +190,26 @@ public class MainActivity extends AppCompatActivity implements
                 signOut();
                 break;
         }
+    }
+
+    public interface KEK {
+        @GET("/")
+        Call<Void> foo();
+    }
+
+    public void foo() {
+        Call<Void> call = service.foo();
+        call.enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+
+            }
+        });
     }
 
     private void showNotification(String nTitle, String nTest) {

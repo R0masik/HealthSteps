@@ -26,7 +26,7 @@ public class NetworkManager {
     public NetworkManager() {
         super();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl("http://192.168.4.1:5005")
+                .baseUrl("http://192.168.95.64:32802")
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
