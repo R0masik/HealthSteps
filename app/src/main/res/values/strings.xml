@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">HealthSteps</string>
+    <string name="notifyTitle">Опаньки!</string>
+    <string name="notifyText">Британские ученые заметили у Вас отклонение</string>
+    <string name="coefText">Ваш коэффициент: %s</string>
+    <string name="server_client_id">187510292051-4mrv4ssjlb9j71ffho7k1nlhf3g4rne6.apps.googleusercontent.com</string>
+</resources>
