@@ -1,7 +1,5 @@
 package com.example.alexdark.helthsteps;
 
-
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -15,7 +13,6 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import com.google.android.gms.tasks.Task;
-import com.google.android.gms.auth.api.Auth;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -39,7 +36,10 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.Random;
+import java.io.IOException;
 
 //import android.support.v4.app.NotificationCompat.Builder;
 import android.support.v4.app.TaskStackBuilder;
@@ -48,13 +48,12 @@ import android.app.PendingIntent;
 import android.content.Context;
 
 import retrofit2.Call;
-import retrofit2.http.Body;
-import retrofit2.http.GET;
-import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
+import retrofit2.converter.scalars.ScalarsConverterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
+import okhttp3.ResponseBody;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -66,17 +65,20 @@ public class MainActivity extends AppCompatActivity implements
 
     private static int RC_SIGN_IN = 100;
 
-    private Button mButtonViewToday;
+    private Button mButtonTestData;
+    private Button mButtonGoogleFitData;
     private Button mConBut;
     //    private Button mButtonSignIn;
     private TextView mCoefTextView;
 
-    private GoogleSignInAccount account;
+    private HealthStepsAcc account;
+    private GoogleSignInAccount mGoogleAccount;
     private GoogleSignInClient mGoogleSignInClient;
     private GoogleApiClient mGoogleApiClient;
     private NetworkManager networkManager;
 
-    private static KEK service;
+    private static IFitnessApi service;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,17 +120,23 @@ public class MainActivity extends AppCompatActivity implements
     protected void onStart() {
         super.onStart();
 
-        account = GoogleSignIn.getLastSignedInAccount(this);
-        if (account != null) {
-            hideSignInButton();
+        mGoogleAccount = GoogleSignIn.getLastSignedInAccount(this);
+        if (mGoogleAccount != null) {
+            showSignedOutUI();
+        } else {
+            showSignedInUI();
         }
     }
 
     private void initViews() {
         //настройка кнопок
-        mButtonViewToday = findViewById(R.id.btn_view_today);
-        mButtonViewToday.setOnClickListener(this);
-        mButtonViewToday.setText("GetData");
+        mButtonTestData = findViewById(R.id.btn_test_data);
+        mButtonTestData.setOnClickListener(this);
+        mButtonTestData.setText("Get test data");
+
+        mButtonGoogleFitData = findViewById(R.id.btn_googlefit_data);
+        mButtonGoogleFitData.setOnClickListener(this);
+        mButtonGoogleFitData.setText("Get data from GoogleFit");
 
         mConBut = findViewById(R.id.resig);
         mConBut.setText("wait for con");
@@ -155,31 +163,56 @@ public class MainActivity extends AppCompatActivity implements
         Log.e("HistoryAPI", "onConnectionFailed");
     }
 
+    public void showSignedInUI() {
+        findViewById(R.id.sign_in_button).setVisibility(View.GONE);
+        findViewById(R.id.sign_out_button).setVisibility(View.VISIBLE);
+        findViewById(R.id.btn_test_data).setVisibility(View.VISIBLE);
+        findViewById(R.id.btn_googlefit_data).setVisibility(View.VISIBLE);
+    }
+
+    public void showSignedOutUI() {
+        findViewById(R.id.sign_in_button).setVisibility(View.VISIBLE);
+        findViewById(R.id.sign_out_button).setVisibility(View.GONE);
+        findViewById(R.id.btn_test_data).setVisibility(View.GONE);
+        findViewById(R.id.btn_googlefit_data).setVisibility(View.GONE);
+    }
+
     @Override
     public void onClick(View v) {
         // обработка гажатия на кнопку
         switch (v.getId()) {
-            case R.id.btn_view_today: {
+            case R.id.btn_googlefit_data: {
                 //запросы данных
-//                new WeekStepTask(DataType.TYPE_STEP_COUNT_DELTA, DataType.AGGREGATE_STEP_COUNT_DELTA).execute();
-//                new WeekNutritionTask(DataType.TYPE_NUTRITION, DataType.AGGREGATE_NUTRITION_SUMMARY).execute();
-//                new WeekPulseTask(DataType.TYPE_HEART_RATE_BPM, DataType.AGGREGATE_HEART_RATE_SUMMARY).execute();
-//                new WeekActivityTask(DataType.TYPE_ACTIVITY_SEGMENT, DataType.AGGREGATE_ACTIVITY_SUMMARY).execute();
-//
-//                String notifyTitle = getResources().getString(R.string.notifyTitle);
-//                String notifyText = getResources().getString(R.string.notifyText);
-//                showNotification(notifyTitle, notifyText);
-//
-//                // запись данныъх в облако
-//                new WriteActivityTask().execute();
+                try {
+                    new WeekStepTask(DataType.TYPE_STEP_COUNT_DELTA, DataType.AGGREGATE_STEP_COUNT_DELTA).execute();
+                } catch (Exception e) {
+                    Log.e("Step exception:", e.toString());
+                }
+                try {
+                    new WeekActivityTask(DataType.TYPE_ACTIVITY_SEGMENT, DataType.AGGREGATE_ACTIVITY_SUMMARY).execute();
+                } catch (Exception e) {
+                    Log.e("Activity exception:", e.toString());
+                }
 
+                String notifyTitle = getResources().getString(R.string.notifyTitle);
+                String notifyText = getResources().getString(R.string.notifyText);
+                showNotification(notifyTitle, notifyText);
+
+                // запись данных в облако
+                new WriteActivityTask().execute();
+                break;
+            }
+            case R.id.btn_test_data: {
+                String baseUrl = "http://195.19.40.201:32098/";
                 Retrofit retrofit = new Retrofit.Builder()
-                        .baseUrl("http://192.168.95.64:32802")
+                        .baseUrl(baseUrl)
+                        .addConverterFactory(ScalarsConverterFactory.create())
                         .addConverterFactory(GsonConverterFactory.create())
                         .build();
 
-                service = retrofit.create(KEK.class);
-                foo();
+                service = retrofit.create(IFitnessApi.class);
+//                rootGet();
+                sendMove(genMoveDataSet());
                 break;
             }
             case R.id.sign_in_button: {
@@ -190,26 +223,6 @@ public class MainActivity extends AppCompatActivity implements
                 signOut();
                 break;
         }
-    }
-
-    public interface KEK {
-        @GET("/")
-        Call<Void> foo();
-    }
-
-    public void foo() {
-        Call<Void> call = service.foo();
-        call.enqueue(new Callback<Void>() {
-            @Override
-            public void onResponse(Call<Void> call, Response<Void> response) {
-
-            }
-
-            @Override
-            public void onFailure(Call<Void> call, Throwable t) {
-
-            }
-        });
     }
 
     private void showNotification(String nTitle, String nTest) {
@@ -242,6 +255,8 @@ public class MainActivity extends AppCompatActivity implements
 //        Intent signInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
+        sendAccInfo();
+        networkManager.googleId = account.google_id;
     }
 
     @Override
@@ -259,13 +274,19 @@ public class MainActivity extends AppCompatActivity implements
 
     private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
         try {
-            account = completedTask.getResult(ApiException.class);
+            mGoogleAccount = completedTask.getResult(ApiException.class);
+            if (mGoogleAccount != null) {
+//                int id = Integer.parseInt(Objects.requireNonNull(mGoogleAccount.getId()));
+                String id = mGoogleAccount.getId();
+                String email = mGoogleAccount.getEmail();
+                Log.e("Google id", id);
+                account = new HealthStepsAcc(id, email);
+            }
             hideSignInButton();
         } catch (ApiException e) {
             // The ApiException status code indicates the detailed failure reason.
             // Please refer to the GoogleSignInStatusCodes class reference for more information.
             Log.e("signInResult: ", "failed code=" + e.getStatusCode());
-
         }
     }
 
@@ -276,7 +297,6 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void hideSignInButton() {
-        Log.e("GoogleID", account.getId());
         findViewById(R.id.sign_in_button).setVisibility(View.GONE);
         findViewById(R.id.sign_out_button).setVisibility(View.VISIBLE);
     }
@@ -284,6 +304,85 @@ public class MainActivity extends AppCompatActivity implements
     public void showSignInButton() {
         findViewById(R.id.sign_in_button).setVisibility(View.VISIBLE);
         findViewById(R.id.sign_out_button).setVisibility(View.GONE);
+    }
+
+    public TestData genMoveDataSet() {
+        ArrayList<MoveItem> items = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            Random randGen = new Random();
+            int time = 3000 + randGen.nextInt(1001);
+            float distance = 5000 + randGen.nextFloat() * 1000;
+            if (i >= 90) {
+                distance -= (i - 89) * 300;
+            }
+            items.add(new MoveItem(time, distance));
+        }
+        return new TestData(account.google_id, items);
+    }
+
+    public void sendAccInfo() {
+        Log.e("POST", "Account info");
+        accLogin(account);
+    }
+
+    public void sendMove(TestData data) {
+        Log.e("POST", "Moves");
+        calculateCoefficient(data);
+    }
+
+    public void rootGet() {
+        Call<Void> call = service.rootGet();
+        call.enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+
+            }
+        });
+    }
+
+    public void accLogin(HealthStepsAcc acc) {
+        Call<ResponseBody> fitCall = service.accLogin(acc);
+        fitCall.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                try (ResponseBody responseBody = response.body()) {
+                    try {
+                        Log.e("Response", responseBody.string());
+                    } catch (IOException | NullPointerException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+            }
+        });
+    }
+
+    public void calculateCoefficient(TestData data) {
+        Call<ResponseBody> call = service.calculateCoefficient(data);
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                try (ResponseBody responseBody = response.body()) {
+                    try {
+                        Log.e("Response", responseBody.string());
+                    } catch (IOException | NullPointerException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+            }
+        });
     }
 
     // запрос данных типа д1 д2 за последнюю неделю
@@ -389,19 +488,6 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private class WeekPulseTask extends MyAsyncTask {
-
-        public WeekPulseTask(DataType d1, DataType d2) {
-            super(d1, d2);
-        }
-
-        protected Void doInBackground(Void... params) {
-            networkManager.pulseSet = displayLastWeekData(mGoogleApiClient, d1, d2);
-            networkManager.sendPulse();
-            return null;
-        }
-    }
-
     private class WeekActivityTask extends MyAsyncTask {
 
         public WeekActivityTask(DataType d1, DataType d2) {
@@ -418,22 +504,6 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private class WeekNutritionTask extends MyAsyncTask {
-
-        public WeekNutritionTask(DataType d1, DataType d2) {
-            super(d1, d2);
-        }
-
-        protected Void doInBackground(Void... params) {
-
-            //обновляем набор датасетов в нетворк менеджере
-            networkManager.nutritionsSet = displayLastWeekData(mGoogleApiClient, d1, d2);
-            //запускаем функцию отправки шагов
-            networkManager.sendNutrition();
-            return null;
-        }
-    }
-
     //Асинхронная таска для записи данных в облако
     private class WriteActivityTask extends AsyncTask<Void, Void, Void> {
 
@@ -442,6 +512,35 @@ public class MainActivity extends AppCompatActivity implements
             return null;
         }
     }
+
+//    private class WeekPulseTask extends MyAsyncTask {
+//
+//        public WeekPulseTask(DataType d1, DataType d2) {
+//            super(d1, d2);
+//        }
+//
+//        protected Void doInBackground(Void... params) {
+//            networkManager.pulseSet = displayLastWeekData(mGoogleApiClient, d1, d2);
+//            networkManager.sendPulse();
+//            return null;
+//        }
+//    }
+
+//    private class WeekNutritionTask extends MyAsyncTask {
+//
+//        public WeekNutritionTask(DataType d1, DataType d2) {
+//            super(d1, d2);
+//        }
+//
+//        protected Void doInBackground(Void... params) {
+//
+//            //обновляем набор датасетов в нетворк менеджере
+//            networkManager.nutritionsSet = displayLastWeekData(mGoogleApiClient, d1, d2);
+//            //запускаем функцию отправки шагов
+//            networkManager.sendNutrition();
+//            return null;
+//        }
+//    }
 
 }
 
