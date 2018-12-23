@@ -85,11 +85,6 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
-        mCoefTextView = findViewById(R.id.textCoefView);
-        String coefText = getResources().getString(R.string.coefText);
-
-        String mCoefString = String.format(coefText, "0.5");
-        mCoefTextView.setText(mCoefString);
 
         initViews();
 
@@ -194,10 +189,6 @@ public class MainActivity extends AppCompatActivity implements
                     Log.e("Activity exception:", e.toString());
                 }
 
-                String notifyTitle = getResources().getString(R.string.notifyTitle);
-                String notifyText = getResources().getString(R.string.notifyText);
-                showNotification(notifyTitle, notifyText);
-
                 // запись данных в облако
                 new WriteActivityTask().execute();
                 break;
@@ -211,7 +202,7 @@ public class MainActivity extends AppCompatActivity implements
                         .build();
 
                 service = retrofit.create(IFitnessApi.class);
-//                rootGet();
+                //  rootGet();
                 sendMove(genMoveDataSet());
                 break;
             }
@@ -255,8 +246,6 @@ public class MainActivity extends AppCompatActivity implements
 //        Intent signInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
-        sendAccInfo();
-        networkManager.googleId = account.google_id;
     }
 
     @Override
@@ -276,13 +265,15 @@ public class MainActivity extends AppCompatActivity implements
         try {
             mGoogleAccount = completedTask.getResult(ApiException.class);
             if (mGoogleAccount != null) {
-//                int id = Integer.parseInt(Objects.requireNonNull(mGoogleAccount.getId()));
                 String id = mGoogleAccount.getId();
                 String email = mGoogleAccount.getEmail();
                 Log.e("Google id", id);
                 account = new HealthStepsAcc(id, email);
+//                sendAccInfo();
+                networkManager.googleId = account.google_id;
+
             }
-            hideSignInButton();
+            showSignedInUI();
         } catch (ApiException e) {
             // The ApiException status code indicates the detailed failure reason.
             // Please refer to the GoogleSignInStatusCodes class reference for more information.
@@ -293,17 +284,7 @@ public class MainActivity extends AppCompatActivity implements
     public void signOut() {
         mGoogleSignInClient.signOut();
         mGoogleSignInClient.revokeAccess();
-        showSignInButton();
-    }
-
-    public void hideSignInButton() {
-        findViewById(R.id.sign_in_button).setVisibility(View.GONE);
-        findViewById(R.id.sign_out_button).setVisibility(View.VISIBLE);
-    }
-
-    public void showSignInButton() {
-        findViewById(R.id.sign_in_button).setVisibility(View.VISIBLE);
-        findViewById(R.id.sign_out_button).setVisibility(View.GONE);
+        showSignedOutUI();
     }
 
     public TestData genMoveDataSet() {
@@ -372,7 +353,21 @@ public class MainActivity extends AppCompatActivity implements
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 try (ResponseBody responseBody = response.body()) {
                     try {
-                        Log.e("Response", responseBody.string());
+                        String respText = responseBody.string();
+                        Log.e("Response", respText);
+                        if (respText.charAt(respText.length() - 1) == '%') {
+                            mCoefTextView = findViewById(R.id.textCoefView);
+                            String coefText = getResources().getString(R.string.coefText);
+                            String mCoefString = String.format(coefText, respText);
+                            mCoefTextView.setText(mCoefString);
+
+                            int respCoef = Integer.parseInt(respText.split("%")[0]);
+                            if (respCoef < 68) {
+                                String notifyTitle = getResources().getString(R.string.notifyTitle);
+                                String notifyText = getResources().getString(R.string.notifyText);
+                                showNotification(notifyTitle, notifyText);
+                            }
+                        }
                     } catch (IOException | NullPointerException e) {
                         e.printStackTrace();
                     }
